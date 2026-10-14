@@ -20,7 +20,7 @@ jobs:
         with:
           cache-generation: cloud-macos-connect-fix-v1
       - name: Build native Apple Silicon binary
-        run: mbx build --locked --release --no-default-features --target aarch64-apple-darwin --bin spotifast
+        run: mbx build --locked --release --target aarch64-apple-darwin --bin spotifast
       - name: Bundle and checksum the app
         run: |
           version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
