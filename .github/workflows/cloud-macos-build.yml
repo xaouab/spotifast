@@ -1,0 +1,43 @@
+name: Build Spotifast macOS test app
+
+on:
+  push:
+    branches: [build/cloud-macos-connect-fix]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+      - uses: jdx/mr-boxington-action@v1
+        with:
+          cache-generation: cloud-macos-connect-fix-v1
+      - name: Build native Apple Silicon binary
+        run: mbx build --locked --release --no-default-features --target aarch64-apple-darwin --bin spotifast
+      - name: Bundle and checksum the app
+        run: |
+          version="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
+          app="$RUNNER_TEMP/Spotifast.app"
+          archive="$RUNNER_TEMP/Spotifast-macos-arm64.zip"
+          bash packaging/macos/bundle.sh "target/aarch64-apple-darwin/release/spotifast" "$app" "$version"
+          ditto -c -k --sequesterRsrc --keepParent "$app" "$archive"
+          shasum -a 256 "$archive" > "$RUNNER_TEMP/SHA256SUMS.txt"
+          codesign --verify --strict "$app"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist"
+          file "$app/Contents/MacOS/Spotifast"
+          cat "$RUNNER_TEMP/SHA256SUMS.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Spotifast-macOS-arm64
+          path: |
+            ${{ runner.temp }}/Spotifast-macos-arm64.zip
+            ${{ runner.temp }}/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7
